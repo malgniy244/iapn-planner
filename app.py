@@ -2,7 +2,6 @@ import streamlit as st
 import json
 import pandas as pd
 from datetime import datetime
-import os
 
 # Page config
 st.set_page_config(
@@ -11,78 +10,41 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 1rem;
+    .main {
+        background-color: #1a1a1a;
     }
-    .cost-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
+    .stApp {
+        background-color: #1a1a1a;
     }
-    .cost-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-        margin-bottom: 0.5rem;
-    }
-    .cost-value {
-        font-size: 2rem;
-        font-weight: bold;
-    }
-    .cost-secondary {
-        font-size: 1rem;
-        opacity: 0.9;
-        margin-top: 0.3rem;
+    h1, h2, h3, h4, h5, h6, p, span, div, label {
+        color: #ffffff !important;
     }
     .event-card {
-        background: #f8f9fa;
-        border: 2px solid #e2e8f0;
+        background: #2d2d2d;
+        border: 2px solid #404040;
         border-radius: 8px;
         padding: 1rem;
-        margin-bottom: 0.8rem;
-    }
-    .day-column {
-        background: #f8fafc;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 1rem;
-        min-height: 400px;
+        margin-bottom: 0.5rem;
     }
     .category-badge {
         display: inline-block;
-        padding: 0.2rem 0.6rem;
+        padding: 0.25rem 0.75rem;
         border-radius: 12px;
         font-size: 0.75rem;
         font-weight: 600;
-        margin-top: 0.3rem;
+        margin: 0.25rem 0;
     }
-    .category-venue { background: #dbeafe; color: #1e40af; }
     .category-food { background: #fce7f3; color: #be185d; }
-    .category-travel { background: #dcfce7; color: #166534; }
-    .category-entertainment { background: #fef3c7; color: #92400e; }
-    .category-accommodation { background: #e9d5ff; color: #6b21a8; }
+    .category-venue { background: #dbeafe; color: #1e40af; }
     .category-other { background: #f3f4f6; color: #374151; }
-    .save-indicator {
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
+    .stButton button {
+        width: 100%;
     }
-    .save-indicator.saved {
-        background: #d1fae5;
-        color: #065f46;
-    }
-    .save-indicator.unsaved {
-        background: #fef3c7;
-        color: #92400e;
+    div[data-testid="stHorizontalBlock"] {
+        gap: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -91,272 +53,281 @@ st.markdown("""
 CATEGORIES = {
     "venue": "Venue",
     "food": "Food & Beverage",
-    "travel": "Travel & Transport",
-    "entertainment": "Entertainment",
-    "accommodation": "Accommodation",
     "other": "Other"
 }
 
 # Data file path
 DATA_FILE = "plan_data.json"
 
-# Initialize session state with IAPN data if not exists
+# Initialize session state with IAPN data
 def init_session_state():
     if 'initialized' not in st.session_state:
-        # Load IAPN 2027 data
-        default_data = {
-            "eventTitle": "IAPN 2027 May 21-24",
-            "eventDescription": "",
-            "attendees": 100,
-            "currency": "HKD",
-            "events": [
-                {"id": 1, "name": "Welcome Reception in Murray", "description": "", "duration": "3 hours", "perPersonCost": 1180, "minimumCost": 140000, "category": "food"},
-                {"id": 5, "name": "Welcome Reception in Hyatt Regency", "description": "", "duration": "3 hours", "perPersonCost": 818, "minimumCost": 68800, "category": "food"},
-                {"id": 6, "name": "Gala Dinner in The Verandah", "description": "", "duration": "Dinner", "perPersonCost": 1628, "minimumCost": 360000, "category": "food"},
-                {"id": 9, "name": "Gala Dinner in Crown Wine Cellar", "description": "", "duration": "Dinner", "perPersonCost": 1688, "minimumCost": 110000, "category": "food"},
-                {"id": 10, "name": "Gala Dinner in WaterMark", "description": "", "duration": "Dinner", "perPersonCost": 0, "minimumCost": 168000, "category": "food"},
-                {"id": 11, "name": "Sai Kung Seafood Dinner", "description": "", "duration": "Dinner", "perPersonCost": 1000, "minimumCost": 0, "category": "food"},
-                {"id": 12, "name": "Star Ferry", "description": "110 passengers. 3 hours 45,000", "duration": "Cocktail", "perPersonCost": 0, "minimumCost": 45000, "category": "food"},
-                {"id": 15, "name": "Star Ferry Canapes/ Lunch", "description": "Canapes Room.", "duration": "Cocktail", "perPersonCost": 500, "minimumCost": 0, "category": "food"},
+        st.session_state.eventTitle = "IAPN 2027 May 21-24"
+        st.session_state.eventDescription = ""
+        st.session_state.attendees = 100
+        st.session_state.currency = "HKD"
+        st.session_state.nextEventId = 23
+        st.session_state.nextDayId = 5
+        st.session_state.has_unsaved = False
+        st.session_state.editing_event = None
+        
+        # All events in library
+        st.session_state.events = [
+            {"id": 1, "name": "Welcome Reception in Murray", "description": "", "duration": "3 hours", "perPersonCost": 1180, "minimumCost": 140000, "category": "food"},
+            {"id": 5, "name": "Welcome Reception in Hyatt Regency", "description": "", "duration": "3 hours", "perPersonCost": 818, "minimumCost": 68800, "category": "food"},
+            {"id": 6, "name": "Gala Dinner in The Verandah", "description": "", "duration": "Dinner", "perPersonCost": 1628, "minimumCost": 360000, "category": "food"},
+            {"id": 9, "name": "Gala Dinner in Crown Wine Cellar", "description": "", "duration": "Dinner", "perPersonCost": 1688, "minimumCost": 110000, "category": "food"},
+            {"id": 10, "name": "Gala Dinner in WaterMark", "description": "", "duration": "Dinner", "perPersonCost": 0, "minimumCost": 168000, "category": "food"},
+            {"id": 11, "name": "Sai Kung Seafood Dinner", "description": "", "duration": "Dinner", "perPersonCost": 1000, "minimumCost": 0, "category": "food"},
+            {"id": 12, "name": "Star Ferry", "description": "110 passengers. 3 hours 45,000", "duration": "Cocktail", "perPersonCost": 0, "minimumCost": 45000, "category": "food"},
+            {"id": 15, "name": "Star Ferry Canapes/ Lunch", "description": "Canapes Room.", "duration": "Cocktail", "perPersonCost": 500, "minimumCost": 0, "category": "food"},
+            {"id": 2, "name": "Conference Hall Rental in Murray", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 75000, "category": "venue"},
+            {"id": 7, "name": "Conference Hall Rental in Hyatt Regency", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 40800, "category": "venue"},
+            {"id": 8, "name": "Conference Hall Rental in W Hotel", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 118000, "category": "venue"},
+            {"id": 3, "name": "Workshop Session", "description": "Interactive training with materials", "duration": "4 hours", "perPersonCost": 1200, "minimumCost": 0, "category": "venue"},
+            {"id": 13, "name": "Tour Bus for Macau", "description": "2 buses, 1 bus 4500 full day estimate", "duration": "", "perPersonCost": 0, "minimumCost": 9000, "category": "other"},
+            {"id": 14, "name": "Macau Lunch - Portugese Food", "description": "Budget 500 per person", "duration": "", "perPersonCost": 500, "minimumCost": 0, "category": "other"},
+            {"id": 16, "name": "Sai Kung Alcohol Cost", "description": "Buy Bottles and bring there.", "duration": "", "perPersonCost": 299.98, "minimumCost": 0, "category": "other"},
+            {"id": 17, "name": "Dragon Dance Performance", "description": "", "duration": "", "perPersonCost": 0, "minimumCost": 10000, "category": "other"},
+            {"id": 18, "name": "Dim Sum Lunch", "description": "", "duration": "Lunch", "perPersonCost": 350, "minimumCost": 0, "category": "other"},
+            {"id": 19, "name": "Korean BBQ Dinner", "description": "", "duration": "Dinner", "perPersonCost": 800, "minimumCost": 0, "category": "other"},
+            {"id": 20, "name": "Star Ferry Alcohol Cost", "description": "", "duration": "Lunch", "perPersonCost": 300, "minimumCost": 0, "category": "other"},
+            {"id": 21, "name": "Murray Lunch", "description": "", "duration": "", "perPersonCost": 600, "minimumCost": 0, "category": "other"},
+            {"id": 22, "name": "Jocky Club Lunch- Saturday/ Sunday", "description": "Wouldnt know until the race schedule out in 2026.", "duration": "", "perPersonCost": 830, "minimumCost": 0, "category": "other"}
+        ]
+        
+        # Days
+        st.session_state.days = [
+            {"id": "day1", "label": "Day 1", "notes": ""},
+            {"id": "day2", "label": "Day 2", "notes": "Murray Conference->Star Ferry Lunch->Sai Kung Seafood Dinner"},
+            {"id": "day3", "label": "Day 3", "notes": "Macau Day Trip->Lunch in Macau-> Come BackBBQ"},
+            {"id": "day4", "label": "Day 4", "notes": "Conference->Dim Sum->Gala"}
+        ]
+        
+        # Schedule (events assigned to days)
+        st.session_state.schedule = {
+            "day1": [{"id": 1, "name": "Welcome Reception in Murray", "description": "", "duration": "3 hours", "perPersonCost": 1180, "minimumCost": 140000, "category": "food"}],
+            "day2": [
                 {"id": 2, "name": "Conference Hall Rental in Murray", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 75000, "category": "venue"},
-                {"id": 7, "name": "Conference Hall Rental in Hyatt Regency", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 40800, "category": "venue"},
-                {"id": 8, "name": "Conference Hall Rental in W Hotel", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 118000, "category": "venue"},
-                {"id": 3, "name": "Workshop Session", "description": "Interactive training with materials", "duration": "4 hours", "perPersonCost": 1200, "minimumCost": 0, "category": "venue"},
-                {"id": 13, "name": "Tour Bus for Macau", "description": "2 buses, 1 bus 4500 full day estimate", "duration": "", "perPersonCost": 0, "minimumCost": 9000, "category": "other"},
-                {"id": 14, "name": "Macau Lunch - Portugese Food", "description": "Budget 500 per person", "duration": "", "perPersonCost": 500, "minimumCost": 0, "category": "other"},
+                {"id": 11, "name": "Sai Kung Seafood Dinner", "description": "", "duration": "Dinner", "perPersonCost": 1000, "minimumCost": 0, "category": "food"},
                 {"id": 16, "name": "Sai Kung Alcohol Cost", "description": "Buy Bottles and bring there.", "duration": "", "perPersonCost": 299.98, "minimumCost": 0, "category": "other"},
                 {"id": 17, "name": "Dragon Dance Performance", "description": "", "duration": "", "perPersonCost": 0, "minimumCost": 10000, "category": "other"},
+                {"id": 12, "name": "Star Ferry", "description": "110 passengers. 3 hours 45,000", "duration": "Cocktail", "perPersonCost": 0, "minimumCost": 45000, "category": "food"},
+                {"id": 15, "name": "Star Ferry Canapes/ Lunch", "description": "Canapes Room.", "duration": "Cocktail", "perPersonCost": 500, "minimumCost": 0, "category": "food"},
+                {"id": 20, "name": "Star Ferry Alcohol Cost", "description": "", "duration": "Lunch", "perPersonCost": 300, "minimumCost": 0, "category": "other"}
+            ],
+            "day3": [
+                {"id": 13, "name": "Tour Bus for Macau", "description": "2 buses, 1 bus 4500 full day estimate", "duration": "", "perPersonCost": 0, "minimumCost": 9000, "category": "other"},
+                {"id": 14, "name": "Macau Lunch - Portugese Food", "description": "Budget 500 per person", "duration": "", "perPersonCost": 500, "minimumCost": 0, "category": "other"},
+                {"id": 19, "name": "Korean BBQ Dinner", "description": "", "duration": "Dinner", "perPersonCost": 800, "minimumCost": 0, "category": "other"}
+            ],
+            "day4": [
+                {"id": 2, "name": "Conference Hall Rental in Murray", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 75000, "category": "venue"},
                 {"id": 18, "name": "Dim Sum Lunch", "description": "", "duration": "Lunch", "perPersonCost": 350, "minimumCost": 0, "category": "other"},
-                {"id": 19, "name": "Korean BBQ Dinner", "description": "", "duration": "Dinner", "perPersonCost": 800, "minimumCost": 0, "category": "other"},
-                {"id": 20, "name": "Star Ferry Alcohol Cost", "description": "", "duration": "Lunch", "perPersonCost": 300, "minimumCost": 0, "category": "other"},
-                {"id": 21, "name": "Murray Lunch", "description": "", "duration": "", "perPersonCost": 600, "minimumCost": 0, "category": "other"},
-                {"id": 22, "name": "Jocky Club Lunch- Saturday/ Sunday", "description": "Wouldnt know until the race schedule out in 2026.", "duration": "", "perPersonCost": 830, "minimumCost": 0, "category": "other"}
-            ],
-            "days": [
-                {"id": "day1", "label": "Day 1", "notes": ""},
-                {"id": "day2", "label": "Day 2", "notes": "Murray Conference->Star Ferry Lunch->Sai Kung Seafood Dinner"},
-                {"id": "day3", "label": "Day 3", "notes": "Macau Day Trip->Lunch in Macau-> Come BackBBQ\n"},
-                {"id": "day4", "label": "Day 4", "notes": "Conference->Dim Sum->Gala"}
-            ],
-            "schedule": {
-                "day1": [{"id": 1, "name": "Welcome Reception in Murray", "description": "", "duration": "3 hours", "perPersonCost": 1180, "minimumCost": 140000, "category": "food"}],
-                "day2": [
-                    {"id": 2, "name": "Conference Hall Rental in Murray", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 75000, "category": "venue"},
-                    {"id": 11, "name": "Sai Kung Seafood Dinner", "description": "", "duration": "Dinner", "perPersonCost": 1000, "minimumCost": 0, "category": "food"},
-                    {"id": 16, "name": "Sai Kung Alcohol Cost", "description": "Buy Bottles and bring there.", "duration": "", "perPersonCost": 299.98, "minimumCost": 0, "category": "other"},
-                    {"id": 17, "name": "Dragon Dance Performance", "description": "", "duration": "", "perPersonCost": 0, "minimumCost": 10000, "category": "other"},
-                    {"id": 12, "name": "Star Ferry", "description": "110 passengers. 3 hours 45,000", "duration": "Cocktail", "perPersonCost": 0, "minimumCost": 45000, "category": "food"},
-                    {"id": 15, "name": "Star Ferry Canapes/ Lunch", "description": "Canapes Room.", "duration": "Cocktail", "perPersonCost": 500, "minimumCost": 0, "category": "food"},
-                    {"id": 20, "name": "Star Ferry Alcohol Cost", "description": "", "duration": "Lunch", "perPersonCost": 300, "minimumCost": 0, "category": "other"}
-                ],
-                "day3": [
-                    {"id": 13, "name": "Tour Bus for Macau", "description": "2 buses, 1 bus 4500 full day estimate", "duration": "", "perPersonCost": 0, "minimumCost": 9000, "category": "other"},
-                    {"id": 14, "name": "Macau Lunch - Portugese Food", "description": "Budget 500 per person", "duration": "", "perPersonCost": 500, "minimumCost": 0, "category": "other"},
-                    {"id": 19, "name": "Korean BBQ Dinner", "description": "", "duration": "Dinner", "perPersonCost": 800, "minimumCost": 0, "category": "other"}
-                ],
-                "day4": [
-                    {"id": 2, "name": "Conference Hall Rental in Murray", "description": "Main venue for keynote sessions", "duration": "Half Day", "perPersonCost": 0, "minimumCost": 75000, "category": "venue"},
-                    {"id": 18, "name": "Dim Sum Lunch", "description": "", "duration": "Lunch", "perPersonCost": 350, "minimumCost": 0, "category": "other"},
-                    {"id": 6, "name": "Gala Dinner in The Verandah", "description": "", "duration": "Dinner", "perPersonCost": 1628, "minimumCost": 360000, "category": "food"}
-                ]
-            },
-            "nextId": 23,
-            "nextDayId": 5
+                {"id": 6, "name": "Gala Dinner in The Verandah", "description": "", "duration": "Dinner", "perPersonCost": 1628, "minimumCost": 360000, "category": "food"}
+            ]
         }
         
-        # Try to load from file, otherwise use default
-        if os.path.exists(DATA_FILE):
-            try:
-                with open(DATA_FILE, 'r') as f:
-                    data = json.load(f)
-                    for key, value in data.items():
-                        st.session_state[key] = value
-            except:
-                for key, value in default_data.items():
-                    st.session_state[key] = value
-        else:
-            for key, value in default_data.items():
-                st.session_state[key] = value
-        
         st.session_state.initialized = True
-        st.session_state.last_saved = datetime.now()
-        st.session_state.has_unsaved = False
 
-# Save data to file
-def save_data():
-    data = {
-        "eventTitle": st.session_state.eventTitle,
-        "eventDescription": st.session_state.eventDescription,
-        "attendees": st.session_state.attendees,
-        "currency": st.session_state.currency,
-        "events": st.session_state.events,
-        "days": st.session_state.days,
-        "schedule": st.session_state.schedule,
-        "nextId": st.session_state.nextId,
-        "nextDayId": st.session_state.nextDayId,
-        "savedAt": datetime.now().isoformat()
-    }
-    
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    st.session_state.last_saved = datetime.now()
-    st.session_state.has_unsaved = False
-
-# Calculate event cost
 def calculate_event_cost(event, attendees):
-    per_person_total = event['perPersonCost'] * attendees
-    return max(per_person_total, event['minimumCost'])
+    """Calculate event cost based on per person and minimum"""
+    per_person = event.get('perPersonCost', 0) * attendees
+    minimum = event.get('minimumCost', 0)
+    return max(per_person, minimum)
 
-# Calculate total budget
-def calculate_total_budget():
+def format_currency(amount, currency):
+    """Format currency based on selected currency"""
+    if currency == "USD":
+        return f"US${amount:,.2f}"
+    else:
+        return f"HK${amount:,.0f}"
+
+def get_total_budget():
+    """Calculate total budget across all scheduled events"""
     total = 0
-    for day_events in st.session_state.schedule.values():
-        for event in day_events:
+    for day_id, events in st.session_state.schedule.items():
+        for event in events:
             total += calculate_event_cost(event, st.session_state.attendees)
     return total
 
-# Format currency
-def format_currency(amount, currency):
-    if currency == 'HKD':
-        return f"HK${int(amount):,}"
-    else:
-        usd = amount / 7.8
-        return f"US${usd:,.2f}"
-
-def format_dual_currency(amount, currency):
-    if currency == 'HKD':
-        primary = f"HK${int(amount):,}"
-        secondary = f"≈ US${(amount / 7.8):,.2f}"
-    else:
-        usd = amount / 7.8
-        primary = f"US${usd:,.2f}"
-        secondary = f"≈ HK${int(amount):,}"
-    return primary, secondary
+def get_total_scheduled_events():
+    """Count total scheduled events"""
+    return sum(len(events) for events in st.session_state.schedule.values())
 
 # Initialize
 init_session_state()
 
-# Auto-save on any change
-if st.session_state.get('has_unsaved', False):
-    save_data()
-
 # Header
-st.markdown('<div class="main-header">🎯 Event & Travel Budget Planner</div>', unsafe_allow_html=True)
+st.title("🎯 Event & Travel Budget Planner")
 
-# Title and description
+# Top row - Event info
 col1, col2 = st.columns([3, 1])
 with col1:
-    event_title = st.text_input("Event/Trip Name", value=st.session_state.eventTitle, key="title_input")
-    if event_title != st.session_state.eventTitle:
-        st.session_state.eventTitle = event_title
-        st.session_state.has_unsaved = True
-        st.rerun()
-    
-    event_desc = st.text_area("Description", value=st.session_state.eventDescription, height=80, key="desc_input")
-    if event_desc != st.session_state.eventDescription:
-        st.session_state.eventDescription = event_desc
-        st.session_state.has_unsaved = True
-        st.rerun()
+    st.session_state.eventTitle = st.text_input("Event/Trip Name", st.session_state.eventTitle)
+    st.session_state.eventDescription = st.text_area("Description", st.session_state.eventDescription, height=100)
 
 with col2:
-    st.write("") # Spacing
-    attendees = st.number_input("Attendees", min_value=1, value=st.session_state.attendees, key="attendees_input")
-    if attendees != st.session_state.attendees:
-        st.session_state.attendees = attendees
-        st.session_state.has_unsaved = True
-        st.rerun()
+    st.write("Attendees")
+    col_minus, col_num, col_plus = st.columns([1, 2, 1])
+    with col_minus:
+        if st.button("➖"):
+            if st.session_state.attendees > 1:
+                st.session_state.attendees -= 1
+                st.session_state.has_unsaved = True
+                st.rerun()
+    with col_num:
+        st.markdown(f"<h2 style='text-align: center; margin: 0;'>{st.session_state.attendees}</h2>", unsafe_allow_html=True)
+    with col_plus:
+        if st.button("➕"):
+            st.session_state.attendees += 1
+            st.session_state.has_unsaved = True
+            st.rerun()
     
+    # Currency toggle
     col_hkd, col_usd = st.columns(2)
     with col_hkd:
-        if st.button("HKD", use_container_width=True, type="primary" if st.session_state.currency == "HKD" else "secondary"):
+        if st.button("HKD", type="primary" if st.session_state.currency == "HKD" else "secondary", use_container_width=True):
             st.session_state.currency = "HKD"
-            st.session_state.has_unsaved = True
             st.rerun()
     with col_usd:
-        if st.button("USD", use_container_width=True, type="primary" if st.session_state.currency == "USD" else "secondary"):
+        if st.button("USD", type="primary" if st.session_state.currency == "USD" else "secondary", use_container_width=True):
             st.session_state.currency = "USD"
-            st.session_state.has_unsaved = True
             st.rerun()
 
-# Save status indicator
-if st.session_state.has_unsaved:
-    st.markdown('<div class="save-indicator unsaved">⚠️ Saving changes...</div>', unsafe_allow_html=True)
-else:
-    last_saved_str = st.session_state.last_saved.strftime("%I:%M:%S %p")
-    st.markdown(f'<div class="save-indicator saved">✓ Auto-saved at {last_saved_str}</div>', unsafe_allow_html=True)
+# Auto-save indicator
+current_time = datetime.now().strftime("%I:%M:%S %p")
+st.success(f"✓ Auto-saved at {current_time}")
 
-# Cost summary
-total_budget = calculate_total_budget()
-per_person = total_budget / st.session_state.attendees if st.session_state.attendees > 0 else 0
-scheduled_count = sum(len(events) for events in st.session_state.schedule.values())
+# Budget summary cards
+total_budget = get_total_budget()
+per_person_cost = total_budget / st.session_state.attendees if st.session_state.attendees > 0 else 0
+total_events = get_total_scheduled_events()
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    primary, secondary = format_dual_currency(total_budget, st.session_state.currency)
     st.markdown(f"""
-    <div class="cost-card">
-        <div class="cost-label">Total Budget</div>
-        <div class="cost-value">{primary}</div>
-        <div class="cost-secondary">{secondary}</div>
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; color: white; text-align: center;'>
+        <div style='font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;'>Total Budget</div>
+        <div style='font-size: 2rem; font-weight: bold;'>{format_currency(total_budget, 'HKD')}</div>
+        <div style='font-size: 1rem; opacity: 0.9; margin-top: 0.3rem;'>≈ {format_currency(total_budget / 7.8, 'USD')}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with col2:
-    primary, secondary = format_dual_currency(per_person, st.session_state.currency)
     st.markdown(f"""
-    <div class="cost-card">
-        <div class="cost-label">Per Person Cost</div>
-        <div class="cost-value">{primary}</div>
-        <div class="cost-secondary">{secondary}</div>
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; color: white; text-align: center;'>
+        <div style='font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;'>Per Person Cost</div>
+        <div style='font-size: 2rem; font-weight: bold;'>{format_currency(per_person_cost, 'HKD')}</div>
+        <div style='font-size: 1rem; opacity: 0.9; margin-top: 0.3rem;'>≈ {format_currency(per_person_cost / 7.8, 'USD')}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with col3:
     st.markdown(f"""
-    <div class="cost-card">
-        <div class="cost-label">Events Scheduled</div>
-        <div class="cost-value">{scheduled_count}</div>
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; color: white; text-align: center;'>
+        <div style='font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;'>Events Scheduled</div>
+        <div style='font-size: 2rem; font-weight: bold;'>{total_events}</div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# Main content - Sidebar and Schedule
-left_col, right_col = st.columns([1, 3])
+# Main content - Two columns
+left_col, right_col = st.columns([1, 2])
 
 with left_col:
     st.subheader("📋 Event Library")
     
-    # Add event button
+    # Add new event button
     if st.button("➕ Add New Event", use_container_width=True):
-        st.session_state.show_add_event = True
+        st.session_state.editing_event = {
+            "id": st.session_state.nextEventId,
+            "name": "",
+            "description": "",
+            "duration": "",
+            "perPersonCost": 0,
+            "minimumCost": 0,
+            "category": "other"
+        }
+        st.session_state.nextEventId += 1
+    
+    # Event editor (if editing)
+    if st.session_state.editing_event:
+        with st.form("event_form"):
+            st.write("### Edit Event")
+            name = st.text_input("Event Name", st.session_state.editing_event.get('name', ''))
+            description = st.text_area("Description", st.session_state.editing_event.get('description', ''))
+            duration = st.text_input("Duration", st.session_state.editing_event.get('duration', ''))
+            category = st.selectbox("Category", list(CATEGORIES.keys()), 
+                                   index=list(CATEGORIES.keys()).index(st.session_state.editing_event.get('category', 'other')))
+            per_person = st.number_input("Per Person Cost (HKD)", value=float(st.session_state.editing_event.get('perPersonCost', 0)))
+            minimum = st.number_input("Minimum Cost (HKD)", value=float(st.session_state.editing_event.get('minimumCost', 0)))
+            
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.form_submit_button("💾 Save", use_container_width=True):
+                    # Update or add event
+                    updated_event = {
+                        "id": st.session_state.editing_event['id'],
+                        "name": name,
+                        "description": description,
+                        "duration": duration,
+                        "perPersonCost": per_person,
+                        "minimumCost": minimum,
+                        "category": category
+                    }
+                    
+                    # Check if updating existing or adding new
+                    existing_idx = next((i for i, e in enumerate(st.session_state.events) if e['id'] == updated_event['id']), None)
+                    if existing_idx is not None:
+                        st.session_state.events[existing_idx] = updated_event
+                    else:
+                        st.session_state.events.append(updated_event)
+                    
+                    st.session_state.editing_event = None
+                    st.session_state.has_unsaved = True
+                    st.rerun()
+            
+            with col_cancel:
+                if st.form_submit_button("❌ Cancel", use_container_width=True):
+                    st.session_state.editing_event = None
+                    st.rerun()
+    
+    st.markdown("---")
     
     # Display events
     for event in st.session_state.events:
         with st.container():
-            st.markdown(f'<div class="event-card">', unsafe_allow_html=True)
             st.markdown(f"**{event['name']}**")
-            if event.get('category'):
-                st.markdown(f'<span class="category-badge category-{event["category"]}">{CATEGORIES.get(event["category"], "Other")}</span>', unsafe_allow_html=True)
-            if event.get('description'):
-                st.caption(event['description'])
+            
+            # Category badge
+            category_class = f"category-{event.get('category', 'other')}"
+            st.markdown(f'<span class="category-badge {category_class}">{CATEGORIES.get(event.get("category", "other"), "Other")}</span>', unsafe_allow_html=True)
+            
+            # Duration
             if event.get('duration'):
                 st.caption(f"⏱️ {event['duration']}")
             
-            cost_text = ""
-            if event['perPersonCost'] > 0:
-                cost_text += f"{format_currency(event['perPersonCost'], st.session_state.currency)}/person "
-            if event['minimumCost'] > 0:
-                cost_text += f"Min: {format_currency(event['minimumCost'], st.session_state.currency)}"
-            if cost_text:
-                st.caption(f"💰 {cost_text}")
+            # Cost
+            cost = calculate_event_cost(event, st.session_state.attendees)
+            per_person_text = f"HK{event['perPersonCost']:,.0f}/person" if event.get('perPersonCost', 0) > 0 else ""
+            min_text = f"Min: HK${event['minimumCost']:,.0f}" if event.get('minimumCost', 0) > 0 else ""
             
-            col_edit, col_del = st.columns(2)
+            if per_person_text and min_text:
+                st.caption(f"💰 {per_person_text} {min_text}")
+            elif per_person_text:
+                st.caption(f"💰 {per_person_text}")
+            elif min_text:
+                st.caption(f"💰 {min_text}")
+            
+            # Buttons
+            col_edit, col_delete = st.columns(2)
             with col_edit:
                 if st.button("✏️", key=f"edit_{event['id']}", use_container_width=True):
                     st.session_state.editing_event = event
-            with col_del:
+                    st.rerun()
+            with col_delete:
                 if st.button("🗑️", key=f"del_{event['id']}", use_container_width=True):
                     st.session_state.events = [e for e in st.session_state.events if e['id'] != event['id']]
                     # Remove from schedule too
@@ -365,13 +336,10 @@ with left_col:
                     st.session_state.has_unsaved = True
                     st.rerun()
             
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown("---")
     
-    st.markdown("---")
-    
-    # Export buttons
+    # Export button
     if st.button("📤 Export Schedule CSV", use_container_width=True):
-        # Create CSV export
         rows = []
         for day in st.session_state.days:
             if day['id'] in st.session_state.schedule:
@@ -412,7 +380,7 @@ with right_col:
         st.session_state.has_unsaved = True
         st.rerun()
     
-    # Display days in columns
+    # Display days in grid
     num_days = len(st.session_state.days)
     cols_per_row = min(4, num_days)
     
@@ -422,9 +390,7 @@ with right_col:
             if i + j < num_days:
                 day = st.session_state.days[i + j]
                 with col:
-                    st.markdown(f'<div class="day-column">', unsafe_allow_html=True)
-                    
-                    # Day header with edit and remove
+                    # Day header
                     col_title, col_remove = st.columns([4, 1])
                     with col_title:
                         st.markdown(f"**{day['label']}**")
@@ -449,55 +415,49 @@ with right_col:
                     # Show scheduled events
                     if day['id'] in st.session_state.schedule:
                         for idx, event in enumerate(st.session_state.schedule[day['id']]):
-                            with st.container():
-                                st.markdown(f"**{event['name']}**")
-                                if event.get('duration'):
-                                    st.caption(f"⏱️ {event['duration']}")
-                                cost = calculate_event_cost(event, st.session_state.attendees)
-                                st.caption(f"💰 {format_currency(cost, st.session_state.currency)}")
-                                
-                                # Move and remove buttons
-                                col_up, col_down, col_rem = st.columns(3)
-                                with col_up:
-                                    if idx > 0 and st.button("⬆️", key=f"up_{day['id']}_{idx}", help="Move up"):
-                                        st.session_state.schedule[day['id']][idx], st.session_state.schedule[day['id']][idx-1] = \
-                                            st.session_state.schedule[day['id']][idx-1], st.session_state.schedule[day['id']][idx]
-                                        st.session_state.has_unsaved = True
-                                        st.rerun()
-                                with col_down:
-                                    if idx < len(st.session_state.schedule[day['id']]) - 1 and st.button("⬇️", key=f"down_{day['id']}_{idx}", help="Move down"):
-                                        st.session_state.schedule[day['id']][idx], st.session_state.schedule[day['id']][idx+1] = \
-                                            st.session_state.schedule[day['id']][idx+1], st.session_state.schedule[day['id']][idx]
-                                        st.session_state.has_unsaved = True
-                                        st.rerun()
-                                with col_rem:
-                                    if st.button("❌", key=f"rem_{day['id']}_{idx}", help="Remove from day"):
-                                        st.session_state.schedule[day['id']].pop(idx)
-                                        st.session_state.has_unsaved = True
-                                        st.rerun()
-                                st.markdown("---")
-                    else:
-                        st.caption("Drop events here")
+                            st.markdown(f"**{event['name']}**")
+                            if event.get('duration'):
+                                st.caption(f"⏱️ {event['duration']}")
+                            cost = calculate_event_cost(event, st.session_state.attendees)
+                            st.caption(f"💰 {format_currency(cost, st.session_state.currency)}")
+                            
+                            # Move and remove buttons
+                            col_up, col_down, col_rem = st.columns(3)
+                            with col_up:
+                                if idx > 0 and st.button("⬆️", key=f"up_{day['id']}_{idx}", help="Move up"):
+                                    st.session_state.schedule[day['id']][idx], st.session_state.schedule[day['id']][idx-1] = \
+                                        st.session_state.schedule[day['id']][idx-1], st.session_state.schedule[day['id']][idx]
+                                    st.session_state.has_unsaved = True
+                                    st.rerun()
+                            with col_down:
+                                if idx < len(st.session_state.schedule[day['id']]) - 1 and st.button("⬇️", key=f"down_{day['id']}_{idx}", help="Move down"):
+                                    st.session_state.schedule[day['id']][idx], st.session_state.schedule[day['id']][idx+1] = \
+                                        st.session_state.schedule[day['id']][idx+1], st.session_state.schedule[day['id']][idx]
+                                    st.session_state.has_unsaved = True
+                                    st.rerun()
+                            with col_rem:
+                                if st.button("❌", key=f"rem_{day['id']}_{idx}", help="Remove from day"):
+                                    st.session_state.schedule[day['id']].pop(idx)
+                                    st.session_state.has_unsaved = True
+                                    st.rerun()
+                            st.markdown("---")
                     
-                    # Add event to this day
+                    # Add event to this day (dropdown selector)
                     if day['id'] in st.session_state.schedule:
-                        available_events = [e for e in st.session_state.events 
-                                          if e not in st.session_state.schedule[day['id']]]
+                        available_events = [e for e in st.session_state.events]
                         if available_events:
-                            event_names = ["Select event to add..."] + [e['name'] for e in available_events]
+                            event_names = ["Select..."] + [e['name'] for e in available_events]
                             selected = st.selectbox(
                                 "Add event",
                                 event_names,
                                 key=f"add_to_{day['id']}",
                                 label_visibility="collapsed"
                             )
-                            if selected != "Select event to add...":
+                            if selected != "Select...":
                                 event_to_add = next(e for e in available_events if e['name'] == selected)
                                 st.session_state.schedule[day['id']].append(event_to_add)
                                 st.session_state.has_unsaved = True
                                 st.rerun()
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
 st.caption(f"💾 Data automatically saved to {DATA_FILE} | Share this app URL with your team for collaboration!")
